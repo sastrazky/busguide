@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:google_fonts/google_fonts.dart';
+
+// ================= FIREBASE =================
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RegisterView extends StatefulWidget {
   const RegisterView({super.key});
@@ -11,15 +13,21 @@ class RegisterView extends StatefulWidget {
       _RegisterViewState();
 }
 
-class _RegisterViewState extends State<RegisterView> {
+class _RegisterViewState
+    extends State<RegisterView> {
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _nameController =
       TextEditingController();
-  final TextEditingController _emailController =
+
+  final TextEditingController
+      _emailController =
       TextEditingController();
-  final TextEditingController _passwordController =
+
+  final TextEditingController
+      _passwordController =
       TextEditingController();
+
   final TextEditingController
       _confirmPasswordController =
       TextEditingController();
@@ -31,43 +39,58 @@ class _RegisterViewState extends State<RegisterView> {
   // ================= REGISTER =================
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ??
-        false)) return;
+        false)) {
+      return;
+    }
 
     if (!agree) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              "Harus menyetujui syarat & ketentuan"),
+            "Harus menyetujui syarat & ketentuan",
+          ),
         ),
       );
       return;
     }
 
-    var url = Uri.parse(
-        "http://localhost/bus_app/register.php");
+    try {
+      // ================= REGISTER FIREBASE =================
+      UserCredential userCredential =
+          await FirebaseAuth.instance
+              .createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password:
+            _passwordController.text.trim(),
+      );
 
-    var response = await http.post(
-      url,
-      body: {
-        "name": _nameController.text,
-        "email": _emailController.text,
-        "password": _passwordController.text,
-      },
-    );
+      // ================= SIMPAN DATA USER =================
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
+        'name': _nameController.text.trim(),
+        'email':
+            _emailController.text.trim(),
+        'createdAt': Timestamp.now(),
+      });
 
-    var data = json.decode(response.body);
-
-    if (data["status"] == "success") {
+      // ================= SUCCESS =================
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Registrasi berhasil"),
+          content: Text(
+            "Registrasi berhasil",
+          ),
         ),
       );
+
       Navigator.pop(context);
-    } else {
+    } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(data["message"]),
+          content: Text(
+            e.message ?? "Terjadi error",
+          ),
         ),
       );
     }
@@ -76,12 +99,15 @@ class _RegisterViewState extends State<RegisterView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F9),
+      backgroundColor:
+          const Color(0xFFF5F7F9),
 
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0056B3),
-        iconTheme:
-            const IconThemeData(color: Colors.white),
+        backgroundColor:
+            const Color(0xFF0056B3),
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ),
         title: Text(
           "Daftar",
           style: GoogleFonts.poppins(
@@ -101,8 +127,10 @@ class _RegisterViewState extends State<RegisterView> {
                 "Buat Akun Baru",
                 style: GoogleFonts.poppins(
                   fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0056B3),
+                  fontWeight:
+                      FontWeight.w600,
+                  color:
+                      const Color(0xFF0056B3),
                 ),
               ),
             ),
@@ -123,11 +151,13 @@ class _RegisterViewState extends State<RegisterView> {
 
             // ================= FORM CARD =================
             Container(
-              padding: const EdgeInsets.all(20),
+              padding:
+                  const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius:
-                    BorderRadius.circular(20),
+                    BorderRadius.circular(
+                        20),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black
@@ -142,41 +172,51 @@ class _RegisterViewState extends State<RegisterView> {
                   children: [
                     // ===== NAME =====
                     _inputField(
-                      controller: _nameController,
+                      controller:
+                          _nameController,
                       label: "Nama",
                       icon: Icons.person,
                       validator: (v) =>
-                          (v == null || v.isEmpty)
+                          (v == null ||
+                                  v.isEmpty)
                               ? "Nama tidak boleh kosong"
                               : null,
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                        height: 16),
 
                     // ===== EMAIL =====
                     _inputField(
-                      controller: _emailController,
+                      controller:
+                          _emailController,
                       label: "Email",
                       icon: Icons.email,
                       validator: (v) {
-                        if (v == null || v.isEmpty) {
+                        if (v == null ||
+                            v.isEmpty) {
                           return "Email tidak boleh kosong";
                         }
+
                         if (!v.contains("@")) {
                           return "Email tidak valid";
                         }
+
                         return null;
                       },
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                        height: 16),
 
                     // ===== PASSWORD =====
                     _inputField(
-                      controller: _passwordController,
+                      controller:
+                          _passwordController,
                       label: "Password",
                       icon: Icons.lock,
-                      obscure: obscurePassword,
+                      obscure:
+                          obscurePassword,
                       toggle: () {
                         setState(() {
                           obscurePassword =
@@ -184,24 +224,30 @@ class _RegisterViewState extends State<RegisterView> {
                         });
                       },
                       validator: (v) {
-                        if (v == null || v.isEmpty) {
+                        if (v == null ||
+                            v.isEmpty) {
                           return "Password tidak boleh kosong";
                         }
+
                         if (v.length < 6) {
                           return "Minimal 6 karakter";
                         }
+
                         return null;
                       },
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                        height: 16),
 
                     // ===== CONFIRM PASSWORD =====
                     _inputField(
                       controller:
                           _confirmPasswordController,
-                      label: "Konfirmasi Password",
-                      icon: Icons.lock_outline,
+                      label:
+                          "Konfirmasi Password",
+                      icon:
+                          Icons.lock_outline,
                       obscure:
                           obscureConfirmPassword,
                       toggle: () {
@@ -211,19 +257,23 @@ class _RegisterViewState extends State<RegisterView> {
                         });
                       },
                       validator: (v) {
-                        if (v == null || v.isEmpty) {
+                        if (v == null ||
+                            v.isEmpty) {
                           return "Konfirmasi password tidak boleh kosong";
                         }
+
                         if (v !=
                             _passwordController
                                 .text) {
                           return "Password tidak cocok";
                         }
+
                         return null;
                       },
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(
+                        height: 16),
 
                     // ===== AGREEMENT =====
                     Row(
@@ -233,7 +283,8 @@ class _RegisterViewState extends State<RegisterView> {
                           onChanged: (val) {
                             setState(() {
                               agree =
-                                  val ?? false;
+                                  val ??
+                                      false;
                             });
                           },
                         ),
@@ -241,26 +292,33 @@ class _RegisterViewState extends State<RegisterView> {
                           child: Text(
                             "Saya setuju dengan syarat & ketentuan",
                             style:
-                                GoogleFonts.poppins(
-                                    fontSize: 12),
+                                GoogleFonts
+                                    .poppins(
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(
+                        height: 10),
 
                     // ===== BUTTON =====
                     SizedBox(
-                      width: double.infinity,
+                      width:
+                          double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _register,
-                        style: ElevatedButton
-                            .styleFrom(
+                        onPressed:
+                            _register,
+                        style:
+                            ElevatedButton
+                                .styleFrom(
                           backgroundColor:
                               const Color(
-                                  0xFF0056B3),
+                            0xFF0056B3,
+                          ),
                           shape:
                               RoundedRectangleBorder(
                             borderRadius:
@@ -270,25 +328,32 @@ class _RegisterViewState extends State<RegisterView> {
                         ),
                         child: Text(
                           "Daftar",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
+                          style:
+                              GoogleFonts
+                                  .poppins(
+                            color:
+                                Colors.white,
                             fontWeight:
-                                FontWeight.w600,
+                                FontWeight
+                                    .w600,
                           ),
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(
+                        height: 10),
 
                     // ===== LOGIN =====
                     TextButton(
                       onPressed: () =>
-                          Navigator.pop(context),
+                          Navigator.pop(
+                              context),
                       child: Text(
                         "Sudah punya akun? Masuk",
                         style:
-                            GoogleFonts.poppins(),
+                            GoogleFonts
+                                .poppins(),
                       ),
                     ),
                   ],
@@ -303,7 +368,8 @@ class _RegisterViewState extends State<RegisterView> {
 
   // ================= INPUT FIELD =================
   Widget _inputField({
-    required TextEditingController controller,
+    required TextEditingController
+        controller,
     required String label,
     required IconData icon,
     String? Function(String?)? validator,
@@ -317,13 +383,15 @@ class _RegisterViewState extends State<RegisterView> {
       style: GoogleFonts.poppins(),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: GoogleFonts.poppins(),
+        labelStyle:
+            GoogleFonts.poppins(),
         prefixIcon: Icon(icon),
         suffixIcon: toggle != null
             ? IconButton(
                 icon: Icon(
                   obscure
-                      ? Icons.visibility_off
+                      ? Icons
+                          .visibility_off
                       : Icons.visibility,
                 ),
                 onPressed: toggle,

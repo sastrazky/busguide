@@ -1,26 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:google_sign_in/google_sign_in.dart';
+
 import 'home_view.dart';
 import 'register_view.dart';
 
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
 
   @override
-  State<LoginView> createState() => _LoginViewState();
+  State<LoginView> createState() =>
+      _LoginViewState();
 }
 
-class _LoginViewState extends State<LoginView> {
-  final _formKey = GlobalKey<FormState>();
+class _LoginViewState
+    extends State<LoginView> {
+  final _formKey =
+      GlobalKey<FormState>();
 
-  final TextEditingController _emailController =
+  final TextEditingController
+      _emailController =
       TextEditingController();
-  final TextEditingController _passwordController =
+
+  final TextEditingController
+      _passwordController =
       TextEditingController();
 
   bool obscurePassword = true;
@@ -34,76 +43,222 @@ class _LoginViewState extends State<LoginView> {
 
   // ================= LOGIN =================
   Future<void> _login() async {
-    var url =
-        Uri.parse("http://localhost/bus_app/login.php");
+    if (!(_formKey.currentState
+            ?.validate() ??
+        false)) {
+      return;
+    }
 
-    var response = await http.post(
-      url,
-      body: {
-        "email": _emailController.text,
-        "password": _passwordController.text,
-      },
-    );
+    try {
+      // ================= LOGIN FIREBASE =================
+      UserCredential userCredential =
+          await FirebaseAuth.instance
+              .signInWithEmailAndPassword(
+        email:
+            _emailController.text.trim(),
+        password:
+            _passwordController.text
+                .trim(),
+      );
 
-    var data = json.decode(response.body);
+      // ================= AMBIL DATA USER =================
+      var userData =
+          await FirebaseFirestore
+              .instance
+              .collection('users')
+              .doc(
+                userCredential.user!.uid,
+              )
+              .get();
 
-    if (data["status"] == "success") {
+      String name = userData['name'];
+
+      // ================= SIMPAN LOGIN =================
       final prefs =
-          await SharedPreferences.getInstance();
+          await SharedPreferences
+              .getInstance();
 
-      prefs.setBool('isLogin', true);
-      prefs.setString('name', data["name"]);
+      await prefs.setBool(
+          'isLogin', true);
+
+      await prefs.setString(
+          'name', name);
+
+      // ================= PINDAH HOME =================
+      if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) =>
-              HomeView(name: data["name"]),
+              HomeView(name: name),
         ),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
-          content: Text(data["message"]),
+          content: Text(
+            e.message ??
+                "Login gagal",
+          ),
         ),
       );
     }
   }
 
-  void _loginWithGoogle() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            const HomeView(name: "Google User"),
-      ),
-    );
+  // ================= GOOGLE LOGIN =================
+  Future<void>
+      _loginWithGoogle() async {
+    try {
+      final GoogleSignIn
+          googleSignIn =
+          GoogleSignIn();
+
+      // ================= RESET SESSION =================
+      await googleSignIn.signOut();
+
+      // ================= PILIH AKUN GOOGLE =================
+      final GoogleSignInAccount?
+          googleUser =
+          await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        return;
+      }
+
+      // ================= AUTH GOOGLE =================
+      final GoogleSignInAuthentication
+          googleAuth =
+          await googleUser
+              .authentication;
+
+      // ================= CREDENTIAL FIREBASE =================
+      final AuthCredential
+          credential =
+          GoogleAuthProvider
+              .credential(
+        accessToken:
+            googleAuth.accessToken,
+        idToken:
+            googleAuth.idToken,
+      );
+
+      // ================= LOGIN FIREBASE =================
+      UserCredential
+          userCredential =
+          await FirebaseAuth.instance
+              .signInWithCredential(
+        credential,
+      );
+
+      User? user =
+          userCredential.user;
+
+      if (user != null) {
+        // ================= SIMPAN FIRESTORE =================
+        await FirebaseFirestore
+            .instance
+            .collection('users')
+            .doc(user.uid)
+            .set({
+          'name':
+              user.displayName ?? "",
+          'email':
+              user.email ?? "",
+          'photoUrl':
+              user.photoURL ?? "",
+          'createdAt':
+              Timestamp.now(),
+        },
+                SetOptions(
+                    merge: true));
+
+        // ================= SESSION LOGIN =================
+        final prefs =
+            await SharedPreferences
+                .getInstance();
+
+        await prefs.setBool(
+          'isLogin',
+          true,
+        );
+
+        await prefs.setString(
+          'name',
+          user.displayName ?? "",
+        );
+
+        // ================= PINDAH HOME =================
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                HomeView(
+              name:
+                  user.displayName ??
+                      "",
+            ),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            e.message ??
+                "Google Login gagal",
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            "Error: $e",
+          ),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F9),
+      backgroundColor:
+          const Color(0xFFF5F7F9),
 
       body: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
+          child:
+              SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
+              padding:
+                  const EdgeInsets
+                      .symmetric(
                 horizontal: 24,
                 vertical: 20,
               ),
               child: Container(
-                decoration: BoxDecoration(
+                decoration:
+                    BoxDecoration(
                   color: Colors.white,
                   borderRadius:
-                      BorderRadius.circular(20),
+                      BorderRadius.circular(
+                          20),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black
-                          .withOpacity(0.05),
+                          .withOpacity(
+                              0.05),
                       blurRadius: 15,
-                      offset: const Offset(0, 5),
+                      offset:
+                          const Offset(
+                              0, 5),
                     ),
                   ],
                 ),
@@ -111,35 +266,54 @@ class _LoginViewState extends State<LoginView> {
                   children: [
                     // ================= HEADER =================
                     Container(
-                      padding: const EdgeInsets.symmetric(
+                      padding:
+                          const EdgeInsets
+                              .symmetric(
                         vertical: 20,
                       ),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF0056B3),
-                        borderRadius: BorderRadius.only(
+                      decoration:
+                          const BoxDecoration(
+                        color: Color(
+                            0xFF0056B3),
+                        borderRadius:
+                            BorderRadius
+                                .only(
                           topLeft:
-                              Radius.circular(20),
+                              Radius
+                                  .circular(
+                                      20),
                           topRight:
-                              Radius.circular(20),
+                              Radius
+                                  .circular(
+                                      20),
                         ),
                       ),
                       child: Row(
                         mainAxisAlignment:
-                            MainAxisAlignment.center,
+                            MainAxisAlignment
+                                .center,
                         children: [
                           const Icon(
-                            Icons.directions_bus,
-                            color: Colors.white,
+                            Icons
+                                .directions_bus,
+                            color:
+                                Colors
+                                    .white,
                             size: 40,
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(
+                              width: 10),
                           Text(
                             'Bus Guide',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
+                            style:
+                                GoogleFonts
+                                    .poppins(
+                              color: Colors
+                                  .white,
                               fontSize: 24,
                               fontWeight:
-                                  FontWeight.w600,
+                                  FontWeight
+                                      .w600,
                             ),
                           ),
                         ],
@@ -149,7 +323,8 @@ class _LoginViewState extends State<LoginView> {
                     // ================= FORM =================
                     Padding(
                       padding:
-                          const EdgeInsets.all(24),
+                          const EdgeInsets
+                              .all(24),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -159,42 +334,57 @@ class _LoginViewState extends State<LoginView> {
                               height: 180,
                             ),
 
-                            const SizedBox(height: 20),
+                            const SizedBox(
+                                height: 20),
 
                             Text(
-                              'Selamat Datang di Bus guide',
-                              style: GoogleFonts.poppins(
+                              'Selamat Datang di Bus Guide',
+                              style:
+                                  GoogleFonts
+                                      .poppins(
                                 fontSize: 20,
                                 fontWeight:
-                                    FontWeight.w600,
+                                    FontWeight
+                                        .w600,
                                 color:
-                                    const Color(0xFF0056B3),
+                                    const Color(
+                                  0xFF0056B3,
+                                ),
                               ),
                             ),
 
-                            const SizedBox(height: 25),
+                            const SizedBox(
+                                height: 25),
 
                             // ===== EMAIL =====
                             TextFormField(
                               controller:
                                   _emailController,
                               style:
-                                  GoogleFonts.poppins(),
-                              validator: (value) {
-                                if (value == null ||
-                                    value.isEmpty) {
+                                  GoogleFonts
+                                      .poppins(),
+                              validator:
+                                  (value) {
+                                if (value ==
+                                        null ||
+                                    value
+                                        .isEmpty) {
                                   return 'Email tidak boleh kosong';
                                 }
                                 return null;
                               },
-                              decoration: InputDecoration(
+                              decoration:
+                                  InputDecoration(
                                 prefixIcon:
-                                    const Icon(Icons
-                                        .account_circle),
+                                    const Icon(
+                                  Icons
+                                      .account_circle,
+                                ),
                                 hintText:
                                     'EmailAnda@gmail.com',
                                 hintStyle:
-                                    GoogleFonts.poppins(),
+                                    GoogleFonts
+                                        .poppins(),
                                 border:
                                     OutlineInputBorder(
                                   borderRadius:
@@ -204,7 +394,8 @@ class _LoginViewState extends State<LoginView> {
                               ),
                             ),
 
-                            const SizedBox(height: 16),
+                            const SizedBox(
+                                height: 16),
 
                             // ===== PASSWORD =====
                             TextFormField(
@@ -213,24 +404,29 @@ class _LoginViewState extends State<LoginView> {
                               obscureText:
                                   obscurePassword,
                               style:
-                                  GoogleFonts.poppins(),
-                              validator: (value) {
-                                if (value == null ||
-                                    value.isEmpty) {
+                                  GoogleFonts
+                                      .poppins(),
+                              validator:
+                                  (value) {
+                                if (value ==
+                                        null ||
+                                    value
+                                        .isEmpty) {
                                   return 'Password tidak boleh kosong';
                                 }
                                 return null;
                               },
-                              decoration: InputDecoration(
+                              decoration:
+                                  InputDecoration(
                                 prefixIcon:
                                     const Icon(
-                                        Icons.lock),
+                                  Icons.lock,
+                                ),
                                 hintText:
                                     'Masukkan sandi',
                                 hintStyle:
-                                    GoogleFonts.poppins(),
-
-                                // ICON MATA
+                                    GoogleFonts
+                                        .poppins(),
                                 suffixIcon:
                                     IconButton(
                                   icon: Icon(
@@ -240,14 +436,15 @@ class _LoginViewState extends State<LoginView> {
                                         : Icons
                                             .visibility,
                                   ),
-                                  onPressed: () {
-                                    setState(() {
+                                  onPressed:
+                                      () {
+                                    setState(
+                                        () {
                                       obscurePassword =
                                           !obscurePassword;
                                     });
                                   },
                                 ),
-
                                 border:
                                     OutlineInputBorder(
                                   borderRadius:
@@ -257,35 +454,45 @@ class _LoginViewState extends State<LoginView> {
                               ),
                             ),
 
-                            const SizedBox(height: 10),
+                            const SizedBox(
+                                height: 10),
 
-                            // ===== LUPA PASSWORD =====
                             Align(
                               alignment:
-                                  Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () {},
+                                  Alignment
+                                      .centerRight,
+                              child:
+                                  TextButton(
+                                onPressed:
+                                    () {},
                                 child: Text(
                                   "Lupa sandi?",
                                   style:
-                                      GoogleFonts.poppins(),
+                                      GoogleFonts
+                                          .poppins(),
                                 ),
                               ),
                             ),
 
-                            const SizedBox(height: 10),
+                            const SizedBox(
+                                height: 10),
 
                             // ===== BUTTON LOGIN =====
                             SizedBox(
-                              width: double.infinity,
+                              width: double
+                                  .infinity,
                               height: 50,
-                              child: ElevatedButton(
-                                onPressed: _login,
-                                style: ElevatedButton
-                                    .styleFrom(
+                              child:
+                                  ElevatedButton(
+                                onPressed:
+                                    _login,
+                                style:
+                                    ElevatedButton
+                                        .styleFrom(
                                   backgroundColor:
                                       const Color(
-                                          0xFF0056B3),
+                                    0xFF0056B3,
+                                  ),
                                   shape:
                                       RoundedRectangleBorder(
                                     borderRadius:
@@ -295,71 +502,92 @@ class _LoginViewState extends State<LoginView> {
                                 ),
                                 child: Text(
                                   'MASUK',
-                                  style: GoogleFonts.poppins(
-                                    color:
-                                        Colors.white,
+                                  style:
+                                      GoogleFonts
+                                          .poppins(
+                                    color: Colors
+                                        .white,
                                     fontWeight:
-                                        FontWeight.w600,
+                                        FontWeight
+                                            .w600,
                                   ),
                                 ),
                               ),
                             ),
 
-                            const SizedBox(height: 20),
+                            const SizedBox(
+                                height: 20),
 
                             // ===== ATAU =====
                             Row(
                               children: [
                                 const Expanded(
-                                    child: Divider()),
+                                  child:
+                                      Divider(),
+                                ),
                                 Padding(
                                   padding:
                                       const EdgeInsets
                                           .symmetric(
-                                              horizontal:
-                                                  10),
+                                    horizontal:
+                                        10,
+                                  ),
                                   child: Text(
                                     "ATAU",
-                                    style: GoogleFonts
-                                        .poppins(
-                                            color: Colors
-                                                .grey),
+                                    style:
+                                        GoogleFonts
+                                            .poppins(
+                                      color: Colors
+                                          .grey,
+                                    ),
                                   ),
                                 ),
                                 const Expanded(
-                                    child: Divider()),
+                                  child:
+                                      Divider(),
+                                ),
                               ],
                             ),
 
-                            const SizedBox(height: 20),
+                            const SizedBox(
+                                height: 20),
 
                             // ===== GOOGLE =====
                             SizedBox(
-                              width: double.infinity,
+                              width: double
+                                  .infinity,
                               height: 50,
                               child:
-                                  OutlinedButton.icon(
+                                  OutlinedButton
+                                      .icon(
                                 onPressed:
                                     _loginWithGoogle,
-                                icon: const Icon(
+                                icon:
+                                    const Icon(
                                   Icons.login,
-                                  color: Colors.red,
+                                  color:
+                                      Colors.red,
                                 ),
                                 label: Text(
                                   "Masuk dengan Google",
                                   style:
-                                      GoogleFonts.poppins(
+                                      GoogleFonts
+                                          .poppins(
                                     fontWeight:
-                                        FontWeight.w600,
-                                    color:
-                                        Colors.black87,
+                                        FontWeight
+                                            .w600,
+                                    color: Colors
+                                        .black87,
                                   ),
                                 ),
                                 style:
-                                    OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                      color:
-                                          Colors.grey),
+                                    OutlinedButton
+                                        .styleFrom(
+                                  side:
+                                      const BorderSide(
+                                    color:
+                                        Colors.grey,
+                                  ),
                                   shape:
                                       RoundedRectangleBorder(
                                     borderRadius:
@@ -370,21 +598,26 @@ class _LoginViewState extends State<LoginView> {
                               ),
                             ),
 
-                            const SizedBox(height: 16),
+                            const SizedBox(
+                                height: 16),
 
                             // ===== REGISTER =====
                             Row(
                               mainAxisAlignment:
-                                  MainAxisAlignment.center,
+                                  MainAxisAlignment
+                                      .center,
                               children: [
                                 Text(
                                   "Belum punya akun? ",
-                                  style: GoogleFonts
-                                      .poppins(
-                                          fontSize: 12),
+                                  style:
+                                      GoogleFonts
+                                          .poppins(
+                                    fontSize: 12,
+                                  ),
                                 ),
                                 TextButton(
-                                  onPressed: () {
+                                  onPressed:
+                                      () {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(

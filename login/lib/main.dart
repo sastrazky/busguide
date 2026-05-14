@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+
 import 'package:shared_preferences/shared_preferences.dart';
+
+// ================= FIREBASE =================
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 import 'login.dart';
 import 'home_view.dart';
@@ -8,17 +13,46 @@ import 'home_view.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final prefs = await SharedPreferences.getInstance();
+  try {
+    // ================= INIT FIREBASE =================
+    await Firebase.initializeApp(
+      options:
+          DefaultFirebaseOptions
+              .currentPlatform,
+    );
 
-  bool isLogin = prefs.getBool('isLogin') ?? false;
-  String name = prefs.getString('name') ?? "";
+    // ================= CHECK LOGIN =================
+    final prefs =
+        await SharedPreferences.getInstance();
 
-  runApp(
-    MyApp(
-      isLogin: isLogin,
-      name: name,
-    ),
-  );
+    bool isLogin =
+        prefs.getBool('isLogin') ?? false;
+
+    String name =
+        prefs.getString('name') ?? "";
+
+    runApp(
+      MyApp(
+        isLogin: isLogin,
+        name: name,
+      ),
+    );
+  } catch (e) {
+    // ================= ERROR FIREBASE =================
+    runApp(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: Text(
+              "Firebase Error:\n$e",
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ================= APP =================
@@ -39,8 +73,10 @@ class MyApp extends StatelessWidget {
 
       theme: ThemeData(
         brightness: Brightness.light,
-        primaryColor: const Color(0xFF0056B3),
-        scaffoldBackgroundColor: const Color(0xFFF5F7F9),
+        primaryColor:
+            const Color(0xFF0056B3),
+        scaffoldBackgroundColor:
+            const Color(0xFFF5F7F9),
         cardColor: Colors.white,
       ),
 
@@ -69,7 +105,8 @@ class SplashScreen extends StatefulWidget {
       _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState
+    extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
@@ -82,9 +119,12 @@ class _SplashScreenState extends State<SplashScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => widget.isLogin
-                ? HomeView(name: widget.name)
-                : const LoginView(),
+            builder: (context) =>
+                widget.isLogin
+                    ? HomeView(
+                        name: widget.name,
+                      )
+                    : const LoginView(),
           ),
         );
       },
@@ -94,7 +134,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0056B3),
+      backgroundColor:
+          const Color(0xFF0056B3),
 
       body: Center(
         child: Column(
@@ -114,7 +155,8 @@ class _SplashScreenState extends State<SplashScreen> {
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 28,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                    FontWeight.bold,
               ),
             ),
           ],

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "294372940295",
+    "project_id": "busguideapp22",
+    "storage_bucket": "busguideapp22.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:294372940295:android:1c9d74117d9c82f5fc28a2",
+        "android_client_info": {
+          "package_name": "com.example.login"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "294372940295-5oi9bhe99bq35s76kvjpdqie54pbqa6v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.login",
+            "certificate_hash": "1e7102768d745c4cb4ab224101e2d04dd7056185"
+          }
+        },
+        {
+          "client_id": "294372940295-5dachqokife8u36pdifdebr0co5re6nn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDd49WpvU0CDLd8qdknaC7Evq38cXPseaM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "294372940295-5dachqokife8u36pdifdebr0co5re6nn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
