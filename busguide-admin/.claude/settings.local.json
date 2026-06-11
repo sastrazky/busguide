@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\sastr\\\\BusGuide\")",
+      "Bash(xargs grep -l \"brand\")",
+      "WebFetch(domain:logowik.com)",
+      "Bash(xargs grep -l \"fi-simple-page\\\\|fi-logo\")",
+      "Bash(xargs grep -l \"fi-logo\\\\|brandLogo\\\\|brand-logo\")",
+      "Bash(xargs grep -l \"fi-simple-header\\\\|fi-logo\")"
+    ]
+  }
+}
